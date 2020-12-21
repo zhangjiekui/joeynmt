@@ -3,6 +3,13 @@
 """
 Vocabulary module
 """
+from collections import defaultdict, Counter
+from typing import List
+import numpy as np
+
+from torchtext.data import Dataset
+
+from joeynmt.constants import UNK_TOKEN, DEFAULT_UNK_ID, EOS_TOKEN, BOS_TOKEN, PAD_TOKEN
 
 class Vocabulary:
     '''Vocabulary represents mapping between tokens and indices. Vocabulary代表着tokens（标记）和indices（索引）之间的映射'''
