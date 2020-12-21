@@ -9,11 +9,13 @@ import numpy as np
 
 from torchtext.data import Dataset
 
-from joeynmt.constants import UNK_TOKEN, DEFAULT_UNK_ID, EOS_TOKEN, BOS_TOKEN, PAD_TOKEN
+from joeynmt.constants import UNK_TOKEN, DEFAULT_UNK_ID, EOS_TOKEN, BOS_TOKEN, PAD_TOKEN,DEFAULT_ENCODING
+
 
 class Vocabulary:
     '''Vocabulary represents mapping between tokens and indices. Vocabulary代表着tokens（标记）和indices（索引）之间的映射'''
-    def __init__(self, tokens:List[str]=None, file:str=None, encoding='utf-8',lower=False) ->None:
+
+    def __init__(self, tokens: List[str] = None, file: str = None, encoding=DEFAULT_ENCODING, lower=False) -> None:
         '''
         Create vocabulary from list of tokens or file.从标记列表或文件来创建词表
         Special tokens are added if not already in file or list.加入特殊标记，即使这些特殊标记没有出现在标记列表或文件中
@@ -23,7 +25,7 @@ class Vocabulary:
         '''
         # don't rename stoi and itos since needed for torchtext
         # warning: stoi grows with unknown tokens, don't use for saving or size
-        
+
         # special symbols
         self.specials = [UNK_TOKEN, PAD_TOKEN, BOS_TOKEN, EOS_TOKEN]
         self.stoi = defaultdict(DEFAULT_UNK_ID)
@@ -31,55 +33,56 @@ class Vocabulary:
         if tokens is not None:
             self._from_list(tokens)
         if file is not None:
-            self._from_file(file,encoding = encoding,lower = lower)
-    def add_tokens(self, tokens:List[str],lower=False) ->None:
+            self._from_file(file, encoding=encoding, lower=lower)
+
+    def add_tokens(self, tokens: List[str], lower=False) -> None:
         """
         Add list of tokens to vocabulary
         :param tokens: list of tokens to add to the vocabulary
         """
         for token in tokens:
-            new_index=len(self.itos)
+            new_index = len(self.itos)
             if token not in self.itos:
-                token=token.strip()
+                token = token.strip()
                 if lower:
-                    token=token.lower()
+                    token = token.lower()
                 self.itos.append(token)
-                self.stoi[token]=new_index
-        
-    def _from_list(self, tokens: List[str] = None,lower=False) -> None:
+                self.stoi[token] = new_index
+
+    def _from_list(self, tokens: List[str] = None, lower=False) -> None:
         """
         Make vocabulary from list of tokens.
         Tokens are assumed to be unique and pre-selected.
         Special symbols are added if not in list.
         :param tokens: list of tokens
         """
-        self.add_tokens(tokens=self.specials+tokens,lower=lower)
+        self.add_tokens(tokens=self.specials + tokens, lower=lower)
         assert len(self.stoi) == len(self.itos)
-        
-    def _from_file(self, file: str,encoding='utf-8',lower=False) -> None:
+
+    def _from_file(self, file: str, encoding=DEFAULT_ENCODING, lower=False) -> None:
         """
         Make vocabulary from contents of file.
         File format: token with index i is in line i.
         :param file: path to file where the vocabulary is loaded from
         """
         tokens = []
-        with open(file, "r",encoding=encoding) as open_file:
+        with open(file, "r", encoding=encoding) as open_file:
             for line in open_file:
                 tokens.append(line.strip("\n"))
-        self._from_list(tokens,lower=lower)
-    
+        self._from_list(tokens, lower=lower)
+
     def __str__(self) -> str:
         return self.stoi.__str__()
-    
-    def to_file(self, file: str,encoding='utf-8') -> None:
+
+    def to_file(self, file: str, encoding=DEFAULT_ENCODING) -> None:
         """
         Save the vocabulary to a file, by writing token with index i in line i.
         :param file: path to file where the vocabulary is written
         """
-        with open(file, "w",encoding=encoding) as open_file:
+        with open(file, "w", encoding=encoding) as open_file:
             for t in self.itos:
                 open_file.write("{}\n".format(t))
-    
+
     def is_unk(self, token: str) -> bool:
         """
         Check whether a token is covered by the vocabulary
@@ -90,11 +93,11 @@ class Vocabulary:
 
     def __len__(self) -> int:
         return len(self.itos)
-    
+
     def _array_to_sentence(self, array: np.array, cut_at_eos=True, skip_pad=True) -> List[str]:
         """
         1D array --> sentence
-        
+
         Converts an array of IDs to a sentence, optionally cutting the result
         off at the end-of-sequence token.
         :param array: 1D array containing indices
@@ -111,11 +114,11 @@ class Vocabulary:
                 continue
             sentence.append(s)
         return sentence
-    
-    def _arrays_to_sentences(self, arrays: np.array, cut_at_eos=True,skip_pad=True) -> List[List[str]]:
+
+    def _arrays_to_sentences(self, arrays: np.array, cut_at_eos=True, skip_pad=True) -> List[List[str]]:
         """
         2D array --> sentences
-        
+
         Convert multiple arrays containing sequences of token IDs to their
         sentences, optionally cutting them off at the end-of-sequence token.
         :param arrays: 2D array containing indices
@@ -125,21 +128,23 @@ class Vocabulary:
         """
         sentences = []
         for array in arrays:
-            sentences.append(self._array_to_sentence(array=array, cut_at_eos=cut_at_eos,skip_pad=skip_pad))
+            sentences.append(self._array_to_sentence(array=array, cut_at_eos=cut_at_eos, skip_pad=skip_pad))
         return sentences
-    
-    def array_to_sentence(self, array: np.array, cut_at_eos=True,skip_pad=True) -> List[List[str]]:
-        dim=len(array.shape)
-        if dim==1:
+
+    def array_to_sentence(self, array: np.array, cut_at_eos=True, skip_pad=True) -> List[List[str]]:
+        dim = len(array.shape)
+        if dim == 1:
             return self._array_to_sentence(array, cut_at_eos, skip_pad)
-        if dim==2:
+        if dim == 2:
             return self._arrays_to_sentences(array, cut_at_eos, skip_pad)
         else:
             raise ValueError(f"要求参数array必须是1D或2D的，但现在输入的参数array是{dim}D的！")
-    def arrays_to_sentences(self, array: np.array, cut_at_eos=True,skip_pad=True) -> List[List[str]]:
-        return self.array_to_sentence(array,cut_at_eos,skip_pad)
-            
-def build_vocab(field: str, max_size: int, min_freq: int=0, dataset: Dataset = None , vocab_file: str = None, encoding='utf-8',lower=False) -> Vocabulary:
+
+    def arrays_to_sentences(self, array: np.array, cut_at_eos=True, skip_pad=True) -> List[List[str]]:
+        return self.array_to_sentence(array, cut_at_eos, skip_pad)
+
+def build_vocab(field: str, max_size: int, min_freq: int = 0, dataset: Dataset = None, vocab_file: str = None,
+                encoding=DEFAULT_ENCODING, lower=False) -> Vocabulary:
     """
     Builds vocabulary for a torchtext `field` from given`dataset` or
     `vocab_file`.
@@ -195,5 +200,5 @@ def build_vocab(field: str, max_size: int, min_freq: int=0, dataset: Dataset = N
     for s in vocab.specials[1:]:
         assert not vocab.is_unk(s)
 
-    return vocab  
-        
+    return vocab
+
