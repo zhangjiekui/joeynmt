@@ -139,61 +139,61 @@ class Vocabulary:
     def arrays_to_sentences(self, array: np.array, cut_at_eos=True,skip_pad=True) -> List[List[str]]:
         return self.array_to_sentence(array,cut_at_eos,skip_pad)
             
-    def build_vocab(field: str, max_size: int, min_freq: int=0, dataset: Dataset = None , vocab_file: str = None, encoding='utf-8',lower=False) -> Vocabulary:
-        """
-        Builds vocabulary for a torchtext `field` from given`dataset` or
-        `vocab_file`.
-        :param field: attribute e.g. "src"
-        :param max_size: maximum size of vocabulary
-        :param min_freq: minimum frequency for an item to be included
-        :param dataset: dataset to load data for field from
-        :param vocab_file: file to store the vocabulary,
-            if not None, load vocabulary from here
-        :return: Vocabulary created from either `dataset` or `vocab_file`
-        """
+def build_vocab(field: str, max_size: int, min_freq: int=0, dataset: Dataset = None , vocab_file: str = None, encoding='utf-8',lower=False) -> Vocabulary:
+    """
+    Builds vocabulary for a torchtext `field` from given`dataset` or
+    `vocab_file`.
+    :param field: attribute e.g. "src"
+    :param max_size: maximum size of vocabulary
+    :param min_freq: minimum frequency for an item to be included
+    :param dataset: dataset to load data for field from
+    :param vocab_file: file to store the vocabulary,
+        if not None, load vocabulary from here
+    :return: Vocabulary created from either `dataset` or `vocab_file`
+    """
 
-        if vocab_file is not None:
-            # load it from file
-            vocab = Vocabulary(file=vocab_file, encoding=encoding, lower=lower)
-        elif dataset is not None:
-            # create newly
-            def filter_min(counter: Counter, min_freq: int):
-                """ Filter counter by min frequency """
-                filtered_counter = Counter({t: c for t, c in counter.items() if c >= min_freq})
-                return filtered_counter
+    if vocab_file is not None:
+        # load it from file
+        vocab = Vocabulary(file=vocab_file, encoding=encoding, lower=lower)
+    elif dataset is not None:
+        # create newly
+        def filter_min(counter: Counter, min_freq: int):
+            """ Filter counter by min frequency """
+            filtered_counter = Counter({t: c for t, c in counter.items() if c >= min_freq})
+            return filtered_counter
 
-            def sort_and_cut(counter: Counter, limit: int):
-                """ Cut counter to most frequent,
-                sorted numerically and alphabetically"""
-                # sort by frequency, then alphabetically
-                tokens_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
-                tokens_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
-                vocab_tokens = [i[0] for i in tokens_and_frequencies[:limit]]
-                return vocab_tokens
+        def sort_and_cut(counter: Counter, limit: int):
+            """ Cut counter to most frequent,
+            sorted numerically and alphabetically"""
+            # sort by frequency, then alphabetically
+            tokens_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+            tokens_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+            vocab_tokens = [i[0] for i in tokens_and_frequencies[:limit]]
+            return vocab_tokens
 
-            tokens = []
-            for i in dataset.examples:
-                if field == "src":
-                    tokens.extend(i.src)
-                elif field == "trg":
-                    tokens.extend(i.trg)
+        tokens = []
+        for i in dataset.examples:
+            if field == "src":
+                tokens.extend(i.src)
+            elif field == "trg":
+                tokens.extend(i.trg)
 
-            counter = Counter(tokens)
-            if min_freq > 0:
-                counter = filter_min(counter, min_freq)
-            vocab_tokens = sort_and_cut(counter, max_size)
-            assert len(vocab_tokens) <= max_size
+        counter = Counter(tokens)
+        if min_freq > 0:
+            counter = filter_min(counter, min_freq)
+        vocab_tokens = sort_and_cut(counter, max_size)
+        assert len(vocab_tokens) <= max_size
 
-            vocab = Vocabulary(tokens=vocab_tokens)
-            assert len(vocab) <= max_size + len(vocab.specials)
-            assert vocab.itos[DEFAULT_UNK_ID()] == UNK_TOKEN
-            
-        else:
-            raise ValueError(f"要求参数dataset或者vocab_file 至少有一个不为空！")
+        vocab = Vocabulary(tokens=vocab_tokens)
+        assert len(vocab) <= max_size + len(vocab.specials)
+        assert vocab.itos[DEFAULT_UNK_ID()] == UNK_TOKEN
 
-        # check for all except for UNK token whether they are OOVs
-        for s in vocab.specials[1:]:
-            assert not vocab.is_unk(s)
+    else:
+        raise ValueError(f"要求参数dataset或者vocab_file 至少有一个不为空！")
 
-        return vocab  
+    # check for all except for UNK token whether they are OOVs
+    for s in vocab.specials[1:]:
+        assert not vocab.is_unk(s)
+
+    return vocab  
         
