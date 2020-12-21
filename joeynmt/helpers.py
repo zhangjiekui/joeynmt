@@ -22,7 +22,7 @@ from torchtext.data import Dataset
 import yaml
 from joeynmt.vocabulary import Vocabulary
 from joeynmt.plotting import plot_heatmap
-
+from constants import DEFAULT_ENCODING
 
 class ConfigurationError(Exception):
     """ Custom exception for misspecifications of configuration """
@@ -46,7 +46,7 @@ def make_model_dir(model_dir: str, overwrite=False) -> str:
     return model_dir
 
 
-def make_logger(log_dir: str = None, mode: str = "train") -> str:
+def make_logger(log_dir: str = None, mode: str = "train",return_log:bool=False) -> str:
     """
     Create a logger for logging the training/testing process.
 
@@ -55,8 +55,10 @@ def make_logger(log_dir: str = None, mode: str = "train") -> str:
     :return: joeynmt version number
     """
     logger = logging.getLogger("") # root logger
-    version = pkg_resources.require("joeynmt")[0].version
-
+    try:
+        version = pkg_resources.require("joeynmt")[0].version
+    except:
+        version='1.0.0'
     # add handlers only once.
     if len(logger.handlers) == 0:
         logger.setLevel(level=logging.DEBUG)
@@ -64,22 +66,26 @@ def make_logger(log_dir: str = None, mode: str = "train") -> str:
             '%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
         if log_dir is not None:
-            if os.path.exists(log_dir):
-                log_file = f'{log_dir}/{mode}.log'
+            if not os.path.exists(log_dir):
+                make_model_dir(log_dir)
+            log_file = f'{log_dir}/{mode}.log'
 
-                fh = logging.FileHandler(log_file)
-                fh.setLevel(level=logging.DEBUG)
-                logger.addHandler(fh)
-                fh.setFormatter(formatter)
+            fh = logging.FileHandler(log_file)
+            fh.setLevel(level=logging.DEBUG)
+            fh.setFormatter(formatter)
+            logger.addHandler(fh)
 
         sh = logging.StreamHandler()
         sh.setLevel(logging.INFO)
         sh.setFormatter(formatter)
-
         logger.addHandler(sh)
-        logger.info("Hello! This is Joey-NMT (version %s).", version)
 
-    return version
+        logger.info("This is Joey-NMT (version %s) and logged in (%s).", version,log_file)
+
+    if return_log:
+        return version,logger
+    else:
+        return version
 
 
 def log_cfg(cfg: dict, prefix: str = "cfg") -> None:
@@ -90,12 +96,14 @@ def log_cfg(cfg: dict, prefix: str = "cfg") -> None:
     :param prefix: prefix for logging
     """
     logger = logging.getLogger(__name__)
+    logger.setLevel(level=logging.INFO)
     for k, v in cfg.items():
         if isinstance(v, dict):
             p = '.'.join([prefix, k])
             log_cfg(v, prefix=p)
         else:
             p = '.'.join([prefix, k])
+            # logger.warning("{:34s} : {}".format(p, v))
             logger.info("{:34s} : {}".format(p, v))
 
 
@@ -166,14 +174,14 @@ def log_data_info(train_data: Dataset, valid_data: Dataset, test_data: Dataset,
     logger.info("Number of Trg words (types): %d", len(trg_vocab))
 
 
-def load_config(path="configs/default.yaml") -> dict:
+def load_config(path="configs/default.yaml",encoding=DEFAULT_ENCODING) -> dict:
     """
     Loads and parses a YAML configuration file.
 
     :param path: path to YAML configuration file
     :return: configuration dictionary
     """
-    with open(path, 'r') as ymlfile:
+    with open(path, 'r',encoding =encoding ) as ymlfile:
         cfg = yaml.safe_load(ymlfile)
     return cfg
 
@@ -322,3 +330,26 @@ def symlink_update(target, link_name):
             os.symlink(target, link_name)
         else:
             raise e
+
+
+if __name__ == '__main__':
+    version,logger = make_logger('log4', mode='train',return_log=True)
+    logger.info(logger)
+    del logger
+    # version,logger = make_logger('log4', mode='train',return_log=False)
+
+    # cfg_dic={'a':"AAA",'b':"BBB",'c_dict':{"c1":"C1_v","c2":"C2_v"}}
+    # log_cfg(cfg_dic)
+
+    input=np.ones((2,3))
+    print(input)
+    mask=subsequent_mask(3)
+    print(mask)
+    cfg=load_config(r"/home/zjk/fairseq_code_analysis/joeynmt/configs/small.yaml")
+    print(cfg)
+    log_cfg(cfg)
+
+
+
+
+
