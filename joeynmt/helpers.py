@@ -189,6 +189,8 @@ def load_config(path="configs/default.yaml",encoding=DEFAULT_ENCODING) -> dict:
 def bpe_postprocess(string, bpe_type="subword-nmt") -> str:
     """
     Post-processor for BPE output. Recombines BPE-split tokens.
+    参见：https://zhpmatrix.github.io/2019/04/26/sentencepiece/
+    这篇博客中先给出sentencepiece，subword-nmt和wordpiece的对比
 
     :param string:
     :param bpe_type: one of {"sentencepiece", "subword-nmt"}
@@ -349,7 +351,8 @@ if __name__ == '__main__':
     print(cfg)
     log_cfg(cfg)
 
-
-
+    sp_bpe_str='"Hello","▁Wor","ld","."'
+    sp_bpe_str ='Hello▁World. !'
+    print(bpe_postprocess(sp_bpe_str,bpe_type='sentencepiece'))
 
 
