@@ -7,6 +7,7 @@ from torch import Tensor
 
 
 # pylint: disable=arguments-differ
+# https://pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention.html?highlight=multiheadattention#torch.nn.MultiheadAttention
 class MultiHeadedAttention(nn.Module):
     def __init__(self, num_heads: int = 8, size: int = 256, dropout: float = 0.1):
         """
@@ -86,12 +87,29 @@ def MultiHeadedAttention_test():
     global output
     mha = MultiHeadedAttention()
     print(mha.head_size, mha.num_heads, mha.model_size)
+
     B, L, D = 2, 5, mha.model_size  # shape 参数
     q = torch.randn(B, L, D)
     k = torch.ones(B, L, D)
     v = torch.rand(B, L, D)
     print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
     mask_int = torch.randint(0, 2, (B, 1, L))
+    mask_bool = (mask_int == True)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+    output = mha(q=q, k=k, v=v, mask=mask_bool)
+    print(f"output shape:{output.shape}")
+
+    print("***"*30)
+
+    B, D = 2, mha.model_size  # shape 参数
+    Lq=5
+    Lkv=15
+    q = torch.randn(B, Lq, D)
+    k = torch.ones(B, Lkv, D)
+    v = torch.rand(B, Lkv, D)
+
+    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
+    mask_int = torch.randint(0, 2, (B, 1, Lkv))
     mask_bool = (mask_int == True)
     print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
     output = mha(q=q, k=k, v=v, mask=mask_bool)
