@@ -8,31 +8,25 @@ from torch import Tensor
 
 # pylint: disable=arguments-differ
 class MultiHeadedAttention(nn.Module):
-    """
-    Multi-Head Attention module from "Attention is All You Need"
-
-    Implementation modified from OpenNMT-py.
-    https://github.com/OpenNMT/OpenNMT-py
-    """
-
-    def __init__(self, num_heads: int, size: int, dropout: float = 0.1):
+    def __init__(self, num_heads: int = 8, size: int = 256, dropout: float = 0.1):
         """
-        Create a multi-headed attention layer.
-        :param num_heads: the number of heads
-        :param size: model size (must be divisible by num_heads)
-        :param dropout: probability of dropping a unit
+            Create a multi-headed attention layer.
+            :param num_heads: the number of heads
+            :param size: model size(embed_dim), must be divisible by num_heads
+            :param dropout: probability of dropping a unit
         """
+
         super().__init__()
-
-        assert size % num_heads == 0
-
+        assert size % num_heads == 0, f"size:int={size}必须能被num_heads={num_heads}整除！"
         self.head_size = head_size = size // num_heads
         self.model_size = size
         self.num_heads = num_heads
+        # print(num_heads * head_size==size)  #True
 
-        self.k_layer = nn.Linear(size, num_heads * head_size)
-        self.v_layer = nn.Linear(size, num_heads * head_size)
-        self.q_layer = nn.Linear(size, num_heads * head_size)
+        # query、key、value
+        self.k_layer = nn.Linear(size, size)
+        self.v_layer = nn.Linear(size, size)
+        self.q_layer = nn.Linear(size, size)
 
         self.output_layer = nn.Linear(size, size)
         self.softmax = nn.Softmax(dim=-1)
@@ -42,13 +36,13 @@ class MultiHeadedAttention(nn.Module):
         """
         Computes multi-headed attention.
 
-        :param k: keys   [B, M, D] with M being the sentence length.
-        :param v: values [B, M, D]
-        :param q: query  [B, M, D]
-        :param mask: optional mask [B, 1, M]
+        :param k: keys   [B, L, D] with L being the sentence length.
+        :param v: values [B, L, D]
+        :param q: query  [B, L, D]
+        :param mask: optional mask [B, 1, L], element must by True or False
         :return:
         """
-        batch_size = k.size(0)
+        batch_size = k.size(0)  # B: batch_size
         num_heads = self.num_heads
 
         # project the queries (q), keys (k), and values (v)
@@ -57,6 +51,8 @@ class MultiHeadedAttention(nn.Module):
         q = self.q_layer(q)
 
         # reshape q, k, v for our computation to [batch_size, num_heads, ..]
+
+        # result shape: [B:batch_size, num_heads, L:seq_len, head_size]
         k = k.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
         v = v.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
         q = q.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
@@ -64,20 +60,20 @@ class MultiHeadedAttention(nn.Module):
         # compute scores
         q = q / math.sqrt(self.head_size)
 
-        # batch x num_heads x query_len x key_len
+        # result shape: batch x num_heads x query_len x key_len
         scores = torch.matmul(q, k.transpose(2, 3))
 
         # apply the mask (if we have one)
-        # we add a dimension for the heads to it below: [B, 1, 1, M]
+        # we add a dimension for the heads to it below: [B, 1, 1, L]
         if mask is not None:
             scores = scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
 
         # apply attention dropout and compute context vectors.
-        attention = self.softmax(scores)
+        attention = self.softmax(scores)  # seq_len中mask为False的位置的attention将为0.0
         attention = self.dropout(attention)
 
         # get context vector (select values with attention) and reshape
-        # back to [B, M, D]
+        # back to [B, L, D]
         context = torch.matmul(attention, v)
         context = context.transpose(1, 2).contiguous().view(
             batch_size, -1, num_heads * self.head_size)
@@ -85,6 +81,21 @@ class MultiHeadedAttention(nn.Module):
         output = self.output_layer(context)
 
         return output
+# 测试用例与用法示范
+def MultiHeadedAttention_test():
+    global output
+    mha = MultiHeadedAttention()
+    print(mha.head_size, mha.num_heads, mha.model_size)
+    B, L, D = 2, 5, mha.model_size  # shape 参数
+    q = torch.randn(B, L, D)
+    k = torch.ones(B, L, D)
+    v = torch.rand(B, L, D)
+    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
+    mask_int = torch.randint(0, 2, (B, 1, L))
+    mask_bool = (mask_int == True)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+    output = mha(q=q, k=k, v=v, mask=mask_bool)
+    print(f"output shape:{output.shape}")
 
 
 # pylint: disable=arguments-differ
