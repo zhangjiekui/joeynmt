@@ -84,9 +84,12 @@ class MultiHeadedAttention(nn.Module):
         return output
 # 测试用例与用法示范
 def MultiHeadedAttention_test():
+    from torch.nn import MultiheadAttention as TorchMultiheadAttention
     global output
     mha = MultiHeadedAttention()
-    print(mha.head_size, mha.num_heads, mha.model_size)
+    mha_t=TorchMultiheadAttention(embed_dim=mha.model_size,num_heads=mha.num_heads,dropout=0.)
+    print("mha  :",mha.head_size, mha.num_heads, mha.model_size)
+    print("mha_t:", mha_t.head_dim, mha_t.num_heads, mha_t.embed_dim)
 
     B, L, D = 2, 5, mha.model_size  # shape 参数
     q = torch.randn(B, L, D)
@@ -95,9 +98,17 @@ def MultiHeadedAttention_test():
     print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
     mask_int = torch.randint(0, 2, (B, 1, L))
     mask_bool = (mask_int == True)
+
+    q_t=q.permute(1,0,2)
+    k_t=k.permute(1,0,2)
+    v_t=v.permute(1,0,2)
+    mask_bool_t=mask_bool.reshape(B,-1)
     print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
     output = mha(q=q, k=k, v=v, mask=mask_bool)
-    print(f"output shape:{output.shape}")
+    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
+    print(f"output      shape:{output.shape}")
+    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
+    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
 
     print("***"*30)
 
@@ -112,8 +123,18 @@ def MultiHeadedAttention_test():
     mask_int = torch.randint(0, 2, (B, 1, Lkv))
     mask_bool = (mask_int == True)
     print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+
+
+    q_t=q.permute(1,0,2)
+    k_t=k.permute(1,0,2)
+    v_t=v.permute(1,0,2)
+    mask_bool_t=mask_bool.reshape(B,-1)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
     output = mha(q=q, k=k, v=v, mask=mask_bool)
-    print(f"output shape:{output.shape}")
+    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
+    print(f"output      shape:{output.shape}")
+    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
+    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
 
 
 # pylint: disable=arguments-differ
