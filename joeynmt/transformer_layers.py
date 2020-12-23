@@ -413,6 +413,12 @@ def MultiHeadedAttention_test():
     print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
     print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
 
+    print("attention---"*10)
+
+    print(f"output[2]   attention:\n{output[2][:,0,:].detach().numpy()}")
+    print(f"output_t[1] attention:\n{output_t[1][:,0,:].detach().numpy()}")
+    assert output[2].equal(output_t[1]),"attenstion 应该相等"
+
 
 if __name__ == '__main__':
     MultiHeadedAttention_test()
