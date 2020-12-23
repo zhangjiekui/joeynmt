@@ -7,7 +7,87 @@ from torch import Tensor
 
 
 # pylint: disable=arguments-differ
-# https://pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention.html?highlight=multiheadattention#torch.nn.MultiheadAttention
+'''
+class MultiHeadedAttention_Origin(nn.Module):
+    """
+    Multi-Head Attention module from "Attention is All You Need"
+
+    Implementation modified from OpenNMT-py.
+    https://github.com/OpenNMT/OpenNMT-py
+    """
+
+    def __init__(self, num_heads: int, size: int, dropout: float = 0.1):
+        """
+        Create a multi-headed attention layer.
+        :param num_heads: the number of heads
+        :param size: model size (must be divisible by num_heads)
+        :param dropout: probability of dropping a unit
+        """
+        super().__init__()
+
+        assert size % num_heads == 0
+
+        self.head_size = head_size = size // num_heads
+        self.model_size = size
+        self.num_heads = num_heads
+
+        self.k_layer = nn.Linear(size, num_heads * head_size)
+        self.v_layer = nn.Linear(size, num_heads * head_size)
+        self.q_layer = nn.Linear(size, num_heads * head_size)
+
+        self.output_layer = nn.Linear(size, size)
+        self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, k: Tensor, v: Tensor, q: Tensor, mask: Tensor = None):
+        """
+        Computes multi-headed attention.
+
+        :param k: keys   [B, M, D] with M being the sentence length.
+        :param v: values [B, M, D]
+        :param q: query  [B, M, D]
+        :param mask: optional mask [B, 1, M]
+        :return:
+        """
+        batch_size = k.size(0)
+        num_heads = self.num_heads
+
+        # project the queries (q), keys (k), and values (v)
+        k = self.k_layer(k)
+        v = self.v_layer(v)
+        q = self.q_layer(q)
+
+        # reshape q, k, v for our computation to [batch_size, num_heads, ..]
+        k = k.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
+        v = v.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
+        q = q.view(batch_size, -1, num_heads, self.head_size).transpose(1, 2)
+
+        # compute scores
+        q = q / math.sqrt(self.head_size)
+
+        # batch x num_heads x query_len x key_len
+        scores = torch.matmul(q, k.transpose(2, 3))
+
+        # apply the mask (if we have one)
+        # we add a dimension for the heads to it below: [B, 1, 1, M]
+        if mask is not None:
+            scores = scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
+
+        # apply attention dropout and compute context vectors.
+        attention = self.softmax(scores)
+        attention = self.dropout(attention)
+
+        # get context vector (select values with attention) and reshape
+        # back to [B, M, D]
+        context = torch.matmul(attention, v)
+        context = context.transpose(1, 2).contiguous().view(
+            batch_size, -1, num_heads * self.head_size)
+
+        output = self.output_layer(context)
+
+        return output
+'''
+
 class MultiHeadedAttention(nn.Module):
     def __init__(self, num_heads: int = 8, size: int = 256, dropout: float = 0.1):
         """
@@ -67,10 +147,11 @@ class MultiHeadedAttention(nn.Module):
         # apply the mask (if we have one)
         # we add a dimension for the heads to it below: [B, 1, 1, L]
         if mask is not None:
-            scores = scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
+            scores = scores.masked_fill(mask.unsqueeze(1), float('-inf'))
 
         # apply attention dropout and compute context vectors.
-        attention = self.softmax(scores)  # seq_len中mask为False的位置的attention将为0.0
+        attention = self.softmax(scores)  # seq_len中mask为True的位置的attention将为0.0
+        attention_origin_returned=attention[:,0,:,:]
         attention = self.dropout(attention)
 
         # get context vector (select values with attention) and reshape
@@ -81,60 +162,7 @@ class MultiHeadedAttention(nn.Module):
 
         output = self.output_layer(context)
 
-        return output
-# 测试用例与用法示范
-def MultiHeadedAttention_test():
-    from torch.nn import MultiheadAttention as TorchMultiheadAttention
-    global output
-    mha = MultiHeadedAttention()
-    mha_t=TorchMultiheadAttention(embed_dim=mha.model_size,num_heads=mha.num_heads,dropout=0.)
-    print("mha  :",mha.head_size, mha.num_heads, mha.model_size)
-    print("mha_t:", mha_t.head_dim, mha_t.num_heads, mha_t.embed_dim)
-
-    B, L, D = 2, 5, mha.model_size  # shape 参数
-    q = torch.randn(B, L, D)
-    k = torch.ones(B, L, D)
-    v = torch.rand(B, L, D)
-    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
-    mask_int = torch.randint(0, 2, (B, 1, L))
-    mask_bool = (mask_int == True)
-
-    q_t=q.permute(1,0,2)
-    k_t=k.permute(1,0,2)
-    v_t=v.permute(1,0,2)
-    mask_bool_t=mask_bool.reshape(B,-1)
-    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
-    output = mha(q=q, k=k, v=v, mask=mask_bool)
-    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
-    print(f"output      shape:{output.shape}")
-    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
-    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
-
-    print("***"*30)
-
-    B, D = 2, mha.model_size  # shape 参数
-    Lq=5
-    Lkv=15
-    q = torch.randn(B, Lq, D)
-    k = torch.ones(B, Lkv, D)
-    v = torch.rand(B, Lkv, D)
-
-    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
-    mask_int = torch.randint(0, 2, (B, 1, Lkv))
-    mask_bool = (mask_int == True)
-    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
-
-
-    q_t=q.permute(1,0,2)
-    k_t=k.permute(1,0,2)
-    v_t=v.permute(1,0,2)
-    mask_bool_t=mask_bool.reshape(B,-1)
-    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
-    output = mha(q=q, k=k, v=v, mask=mask_bool)
-    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
-    print(f"output      shape:{output.shape}")
-    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
-    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
+        return output, attention , attention_origin_returned
 
 
 # pylint: disable=arguments-differ
@@ -322,3 +350,72 @@ class TransformerDecoderLayer(nn.Module):
         o = self.feed_forward(self.dropout(h2) + h1)
 
         return o
+
+# 测试用例与用法示范
+def MultiHeadedAttention_test():
+    from torch.nn import MultiheadAttention as TorchMultiheadAttention
+    global output
+    mha = MultiHeadedAttention()
+    mha_t=TorchMultiheadAttention(embed_dim=mha.model_size,num_heads=mha.num_heads,dropout=0.)
+    print("mha  :",mha.head_size, mha.num_heads, mha.model_size)
+    print("mha_t:", mha_t.head_dim, mha_t.num_heads, mha_t.embed_dim)
+
+    B, L, D = 2, 5, mha.model_size  # shape 参数
+    q = torch.randn(B, L, D)
+    k = torch.ones(B, L, D)
+    v = torch.rand(B, L, D)
+    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
+    # mask_int = torch.randint(0, 2, (B, 1, L))
+    mask_int = torch.zeros((B, 1, L))
+    # mask_int = torch.ones((B, 1, L))
+    mask_bool = (mask_int == 1)
+
+    q_t=q.permute(1,0,2)
+    k_t=k.permute(1,0,2)
+    v_t=v.permute(1,0,2)
+    mask_bool_t=mask_bool.reshape(B,-1)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+    output = mha(q=q, k=k, v=v, mask=mask_bool)
+    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
+    print(f"output[0]   shape:{output[0].shape}") # output
+    print(f"output[1]   shape:{output[1].shape}") # attn after dropout
+    print(f"output[2]   shape:{output[2].shape}")  # attn without dropout, reshaped same to torch.nn.MultiheadAttention
+
+    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
+    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
+
+    print("***"*30)
+
+    B, D = 2, mha.model_size  # shape 参数
+    Lq=5
+    Lkv=15
+    q = torch.randn(B, Lq, D)
+    k = torch.ones(B, Lkv, D)
+    v = torch.rand(B, Lkv, D)
+
+    print(f"shape 参数, q:{q.shape} k:{k.shape} v:{v.shape}")
+    mask_int = torch.randint(0, 2, (B, 1, Lkv))
+    mask_bool = (mask_int == True)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+
+
+    q_t=q.permute(1,0,2)
+    k_t=k.permute(1,0,2)
+    v_t=v.permute(1,0,2)
+    mask_bool_t=mask_bool.reshape(B,-1)
+    print(f"mask_int:{str(mask_int)} ||\nmask_bool:{str(mask_bool)} ||\n")
+    output = mha(q=q, k=k, v=v, mask=mask_bool)
+    output_t = mha_t(query=q_t, key=k_t, value=v_t, key_padding_mask=mask_bool_t)
+    print(f"output[0]   shape:{output[0].shape}") # output
+    print(f"output[1]   shape:{output[1].shape}") # attn after dropout
+    print(f"output[2]   shape:{output[2].shape}")  # attn without dropout, reshaped same to torch.nn.MultiheadAttention
+
+    print(f"output_t[0] shape:{output_t[0].shape}")  # attn_output: (L:tgt len, N:batch, E:emb_dim)
+    print(f"output_t[1] shape:{output_t[1].shape}")  # attn_output_weights: (N, L, S)(N,L,S:src len)
+
+
+if __name__ == '__main__':
+    MultiHeadedAttention_test()
+
+
+
