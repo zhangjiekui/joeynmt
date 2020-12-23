@@ -236,7 +236,8 @@ class PositionalEncoding(nn.Module):
         # Add position encodings
         return emb + self.pe[:, :emb.size(1)]
 
-
+# https://github.com/pytorch/pytorch/blob/68d438c9dade66073b3f9657bc077623c22001b9/torch/nn/modules/transformer.py#L241
+# pytorch class TransformerEncoderLayer(Module)
 class TransformerEncoderLayer(nn.Module):
     """
     One Transformer encoder layer has a Multi-head attention layer plus
@@ -266,6 +267,8 @@ class TransformerEncoderLayer(nn.Module):
         self.size = size
 
     # pylint: disable=arguments-differ
+    # https://github.com/pytorch/pytorch/blob/68d438c9dade66073b3f9657bc077623c22001b9/torch/nn/modules/transformer.py#L282
+    # def forward(self, src: Tensor, src_mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
     def forward(self, x: Tensor, mask: Tensor) -> Tensor:
         """
         Forward pass for a single transformer encoder layer.
@@ -283,7 +286,8 @@ class TransformerEncoderLayer(nn.Module):
         o = self.feed_forward(h)
         return o
 
-
+# https://github.com/pytorch/pytorch/blob/68d438c9dade66073b3f9657bc077623c22001b9/torch/nn/modules/transformer.py#L303
+# class TransformerDecoderLayer(Module):
 class TransformerDecoderLayer(nn.Module):
     """
     Transformer decoder layer.
@@ -323,6 +327,8 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     # pylint: disable=arguments-differ
+    # https://github.com/pytorch/pytorch/blob/68d438c9dade66073b3f9657bc077623c22001b9/torch/nn/modules/transformer.py#L348
+    # def forward(self, tgt: Tensor, memory: Tensor, tgt_mask: Optional[Tensor] = None, memory_mask: Optional[Tensor] = None,
     def forward(self,
                 x: Tensor = None,
                 memory: Tensor = None,
